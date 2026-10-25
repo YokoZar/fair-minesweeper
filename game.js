@@ -238,7 +238,18 @@ class MinesweeperGame {
     }
 
     attachCellListeners(el, r, c) {
-        // Mousedown for face expression & chording
+        // Prevent default browser context menu on right click / long press
+        el.addEventListener("contextmenu", (e) => {
+            e.preventDefault();
+        });
+
+        // Track touch gestures to prevent synthetic mouse click conflicts
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchMoved = false;
+        let longPressTriggered = false;
+
+        // Desktop mouse chord & click handling
         el.addEventListener("mousedown", (e) => {
             if (this.boardData.game_state !== "LOST" && this.boardData.game_state !== "WON") {
                 this.setFace("😮");
@@ -257,6 +268,12 @@ class MinesweeperGame {
                 this.setFace("🙂");
             }
 
+            // Suppress synthetic mouseup if touch long-press just fired
+            if (longPressTriggered) {
+                longPressTriggered = false;
+                return;
+            }
+
             if (e.button === 0) { // Left click
                 this.onCellClick(r, c);
             } else if (e.button === 2) { // Right click
@@ -266,24 +283,103 @@ class MinesweeperGame {
             }
         });
 
-        // Double click chord
-        el.addEventListener("dblclick", () => {
+        // Double click chord (Desktop)
+        el.addEventListener("dblclick", (e) => {
+            e.preventDefault();
             this.onCellChord(r, c);
         });
 
-        // Touch long-press for mobile flagging
+        // Mobile touch handling (long-press: flag hidden tile OR chord revealed number)
         el.addEventListener("touchstart", (e) => {
-            this.longPressTimer = setTimeout(() => {
-                this.onCellFlag(r, c);
-                this.longPressTimer = null;
-            }, 450);
-        });
+            if (e.touches.length > 1) {
+                if (this.longPressTimer) {
+                    clearTimeout(this.longPressTimer);
+                    this.longPressTimer = null;
+                }
+                return;
+            }
 
-        el.addEventListener("touchend", (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            touchMoved = false;
+            longPressTriggered = false;
+
+            if (this.boardData.game_state !== "LOST" && this.boardData.game_state !== "WON") {
+                this.setFace("😮");
+            }
+
+            this.longPressTimer = setTimeout(() => {
+                this.longPressTimer = null;
+                longPressTriggered = true;
+
+                if (this.boardData.game_state === "IN_PROGRESS" || this.boardData.game_state === "NOT_STARTED") {
+                    this.setFace("🙂");
+                }
+
+                if (!this.boardData || !this.boardData.grid || !this.boardData.grid[r]) return;
+                const cellData = this.boardData.grid[r][c];
+
+                if (cellData.state === 1 && cellData.adj > 0) {
+                    // Mobile: Long-press on revealed number performs a chord (both-click)
+                    this.onCellChord(r, c);
+                    if (navigator.vibrate) navigator.vibrate(35);
+                } else if (cellData.state === 0 || cellData.state === 2) {
+                    // Mobile: Long-press on hidden or flagged tile toggles flag
+                    this.onCellFlag(r, c);
+                    if (navigator.vibrate) navigator.vibrate(25);
+                }
+            }, 380);
+        }, { passive: true });
+
+        el.addEventListener("touchmove", (e) => {
+            if (!this.longPressTimer) return;
+            const dx = e.touches[0].clientX - touchStartX;
+            const dy = e.touches[0].clientY - touchStartY;
+            // If finger moved > 10px, the user is panning/scrolling the grid
+            if (Math.hypot(dx, dy) > 10) {
+                touchMoved = true;
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+                if (this.boardData.game_state === "IN_PROGRESS" || this.boardData.game_state === "NOT_STARTED") {
+                    this.setFace("🙂");
+                }
+            }
+        }, { passive: true });
+
+        el.addEventListener("touchcancel", () => {
             if (this.longPressTimer) {
                 clearTimeout(this.longPressTimer);
                 this.longPressTimer = null;
-                this.onCellClick(r, c);
+            }
+            if (this.boardData.game_state === "IN_PROGRESS" || this.boardData.game_state === "NOT_STARTED") {
+                this.setFace("🙂");
+            }
+        });
+
+        el.addEventListener("touchend", (e) => {
+            if (this.boardData.game_state === "IN_PROGRESS" || this.boardData.game_state === "NOT_STARTED") {
+                this.setFace("🙂");
+            }
+
+            if (longPressTriggered) {
+                e.preventDefault();
+                return;
+            }
+
+            if (this.longPressTimer) {
+                // Short tap (finger lifted before 380ms)
+                clearTimeout(this.longPressTimer);
+                this.longPressTimer = null;
+
+                if (!touchMoved) {
+                    e.preventDefault(); // Suppress synthetic 300ms delayed click
+                    if (this.boardData && this.boardData.grid && this.boardData.grid[r]) {
+                        const cellData = this.boardData.grid[r][c];
+                        if (cellData.state === 0) {
+                            this.onCellClick(r, c);
+                        }
+                    }
+                }
             }
         });
     }

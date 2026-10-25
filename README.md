@@ -13,6 +13,7 @@ Fair Minesweeper is a strictly logical Minesweeper variant powered by a Python c
 3. **Unforced-Guess Retribution**: If you take an unforced gamble while at least one deducible safe move existed elsewhere on the board, the game shifts the mines to ensure you detonate immediately!
 4. **Interactive Post-Mortem Visualizer**: Upon death, the game highlights which tile you missed, highlights the clue(s) that proved it safe, and gives you a step-by-step logic explanation.
 5. **Time Machine (Undo)**: Press <kbd>Ctrl</kbd> + <kbd>Z</kbd> or click **Rewind Death** to jump back to the moment before your fatal guess and try another logical move.
+6. **Mobile & Desktop Chording**: Double-click, middle-click, or click both buttons together on desktop to open remaining safe neighbors once surrounding flags match the number. On mobile, simply **long-press any revealed number** to chord!
 
 ---
 
