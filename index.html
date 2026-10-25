@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fair Minesweeper - Pure Logic Variant</title>
+    <meta name="description" content="A strictly logical Minesweeper variant written in Python with WebAssembly. Forced guesses are guaranteed safe, and unforced guesses are ruthlessly punished.">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="stylesheet" href="style.css?v=20261025_03">
+</head>
+<body>
+
+    <!-- WebAssembly Engine Loader Overlay -->
+    <div id="engineLoader" class="engine-loader">
+        <div class="spinner"></div>
+        <div id="loaderText" class="loader-text">Loading WebAssembly Python engine...</div>
+    </div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="brand-badge">⚡ Pure Logic Engine (Python / WASM)</div>
+            <h1>Fair Minesweeper</h1>
+            <p class="tagline">If you think, you cannot lose to luck. If you gamble when logic was available, you die instantly.</p>
+        </header>
+
+        <!-- Difficulty Navigation -->
+        <nav class="difficulty-bar" aria-label="Game Difficulty">
+            <button class="diff-btn active" data-diff="beginner" id="btnDiffBeginner">Beginner (9×9)</button>
+            <button class="diff-btn" data-diff="intermediate" id="btnDiffIntermediate">Intermediate (16×16)</button>
+            <button class="diff-btn" data-diff="expert" id="btnDiffExpert">Expert (30×16)</button>
+            <button class="diff-btn" data-diff="custom" id="btnDiffCustom">Custom...</button>
+        </nav>
+
+        <!-- Main Game Card -->
+        <main class="game-card">
+            <!-- Game HUD -->
+            <div class="game-dashboard">
+                <div class="digital-display" id="mineCountDisplay" title="Mines remaining">010</div>
+                <button class="face-btn" id="faceBtn" title="Restart Game" aria-label="Restart Game">🙂</button>
+                <div class="digital-display" id="timerDisplay" title="Elapsed Time">000</div>
+            </div>
+
+            <!-- Board Grid Wrapper -->
+            <div class="board-scroll-container">
+                <div class="board-grid" id="boardGrid" role="grid" aria-label="Minesweeper Board"></div>
+            </div>
+
+            <!-- Post-Mortem Visualizer Card -->
+            <section class="post-mortem-card" id="postMortemCard" style="display: none;" aria-live="polite">
+                <div class="post-mortem-header">
+                    <div class="post-mortem-title">💥 Unforced Gamble Punished!</div>
+                </div>
+                <div class="post-mortem-body" id="postMortemText">
+                    You made an unforced guess, but a tile was guaranteed safe.
+                </div>
+                <div class="post-mortem-actions">
+                    <button class="btn-undo" id="undoBtn">
+                        <span>⏪</span> Rewind Death (Undo)
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer / Controls -->
+        <footer class="footer-bar">
+            <button class="footer-btn" id="footerUndoBtn" title="Rewind last move (Ctrl+Z or U)">
+                <span>⏪</span> Undo Move (Ctrl+Z)
+            </button>
+            <button class="footer-btn" id="muteBtn" title="Toggle audio synthesizer (M)">
+                🔊 Sound On
+            </button>
+            <button class="footer-btn" id="rulesBtn" title="Read fair variant rules">
+                📖 Rules & Mechanics
+            </button>
+        </footer>
+    </div>
+
+    <!-- Custom Game Modal -->
+    <div class="modal-overlay" id="customModal">
+        <div class="modal-card">
+            <div class="modal-title">Custom Grid Settings</div>
+            <div class="form-group">
+                <label for="customWidth">Width (4 – 50)</label>
+                <input type="number" id="customWidth" value="20" min="4" max="50">
+            </div>
+            <div class="form-group">
+                <label for="customHeight">Height (4 – 30)</label>
+                <input type="number" id="customHeight" value="15" min="4" max="30">
+            </div>
+            <div class="form-group">
+                <label for="customMines">Mines Count</label>
+                <input type="number" id="customMines" value="50" min="1" max="1400">
+            </div>
+            <div class="modal-actions">
+                <button class="btn-secondary" id="btnCustomCancel">Cancel</button>
+                <button class="btn-undo" id="btnCustomConfirm">Start Game</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div class="modal-overlay" id="rulesModal">
+        <div class="modal-card" style="max-width: 520px;">
+            <div class="modal-title">Fair Minesweeper Rules</div>
+            <div style="font-size: 0.92rem; color: var(--text-secondary); line-height: 1.6; display: flex; flex-direction: column; gap: 12px;">
+                <p>
+                    <strong style="color: var(--text-primary);">1. The Pure Logic Contract:</strong><br>
+                    You are never required to guess blindly. If you solve everything deductively, you will win every single game.
+                </p>
+                <p>
+                    <strong style="color: var(--accent-emerald);">2. Forced Guess Protection:</strong><br>
+                    Whenever the board reaches an ambiguous 50/50 state where zero tiles can be logically proven safe, 
+                    whatever tile you choose to guess is <strong style="color: #fff;">100% guaranteed safe</strong>.
+                </p>
+                <p>
+                    <strong style="color: var(--accent-rose);">3. Unforced Guess Retribution:</strong><br>
+                    If you take a guess while there was <em>at least one</em> tile on the board that was logically deducible as safe, 
+                    the game actively shifts the hidden mines to guarantee you step on one!
+                </p>
+                <p>
+                    <strong style="color: var(--accent-cyan);">4. Time Machine / Undo:</strong><br>
+                    Made a mistake or got punished? Press <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">Ctrl+Z</kbd> or click <strong>Rewind Death</strong> to revert to the exact moment before the fatal click and try another logical move!
+                </p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-secondary" id="btnRulesClose">Got it!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="audio.js?v=20261025_03"></script>
+    <script src="embedded_python.js?v=20261025_03"></script>
+    <script src="pyodide_runner.js?v=20261025_03"></script>
+    <script src="game.js?v=20261025_03"></script>
+
+    <script>
+        // Mount Pyodide and launch application
+        const loaderEl = document.getElementById("engineLoader");
+        const loaderText = document.getElementById("loaderText");
+
+        window.pyodideBridge.init((statusMsg) => {
+            loaderText.textContent = statusMsg;
+        }).then(() => {
+            loaderEl.classList.add("hidden");
+            window.minesweeperApp.startNewGame();
+        }).catch((err) => {
+            loaderText.textContent = "Error loading engine: " + err.message;
+        });
+    </script>
+</body>
+</html>
