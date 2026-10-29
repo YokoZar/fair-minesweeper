@@ -58,6 +58,7 @@ class KarmaEngine:
 
         # Check Karma Condition
         is_proven_safe = (r, c) in result.safe_cells
+        is_proven_mine = (r, c) in result.mine_cells
         deductions_available = len(result.safe_cells) > 0
 
         # --- CASE 1: PROVEN SAFE MOVE ---
@@ -66,6 +67,27 @@ class KarmaEngine:
             return {
                 "status": "SAFE_MOVE",
                 "revealed": [{"r": cr, "c": cc} for cr, cc in revealed],
+                "board": self.board.to_dict(),
+            }
+
+        # --- CASE 1B: PROVEN MINE CLICK (DIRECT ERROR) ---
+        if is_proven_mine:
+            self.board.reveal(r, c)
+            deduction = result.deductions.get((r, c))
+            explanation = deduction.explanation if deduction else f"Tile ({r+1}, {c+1}) was logically proven to be a mine."
+            clues = deduction.clues if deduction else []
+            self.board.post_mortem = {
+                "clicked": {"r": r, "c": c},
+                "punished": True,
+                "missed_safe_cell": None,
+                "clues": [{"r": cr, "c": cc} for cr, cc in clues],
+                "explanation": explanation,
+            }
+            return {
+                "status": "PUNISHED",
+                "clicked": {"r": r, "c": c},
+                "missed_safe_cell": None,
+                "explanation": explanation,
                 "board": self.board.to_dict(),
             }
 
@@ -180,7 +202,7 @@ class KarmaEngine:
             def touches_any_revealed(r, c):
                 return any(abs(r - rev_r) <= 1 and abs(c - rev_c) <= 1 for rev_r, rev_c in revealed_all)
 
-            floating_mines = [m for m in self.board.mines if not touches_any_revealed(m[0], m[1])]
+            floating_mines = [m for m in self.board.mines if m != (target_r, target_c) and not touches_any_revealed(m[0], m[1])]
             if floating_mines:
                 donor = floating_mines[0]
                 self.board.mines.remove(donor)
@@ -253,13 +275,13 @@ class KarmaEngine:
                     return any(abs(r - rev_r) <= 1 and abs(c - rev_c) <= 1 for rev_r, rev_c in revealed_all)
 
                 if mine_delta > 0:
-                    floating = [m for m in list(self.board.mines) if not touches_any_revealed(m[0], m[1])]
+                    floating = [m for m in list(self.board.mines) if m != (target_r, target_c) and not touches_any_revealed(m[0], m[1])]
                     for i in range(min(mine_delta, len(floating))):
                         self.board.mines.remove(floating[i])
                 elif mine_delta < 0:
                     all_hidden_floating = [
                         (r, c) for r in range(self.board.height) for c in range(self.board.width)
-                        if self.board.state[r][c] == STATE_HIDDEN and (r, c) not in self.board.mines and not touches_any_revealed(r, c)
+                        if (r, c) != (target_r, target_c) and self.board.state[r][c] == STATE_HIDDEN and (r, c) not in self.board.mines and not touches_any_revealed(r, c)
                     ]
                     for i in range(min(abs(mine_delta), len(all_hidden_floating))):
                         self.board.mines.add(all_hidden_floating[i])
@@ -298,7 +320,7 @@ class KarmaEngine:
 
             all_hidden_floating = [
                 (r, c) for r in range(self.board.height) for c in range(self.board.width)
-                if self.board.state[r][c] == STATE_HIDDEN and (r, c) not in self.board.mines and not touches_any_revealed(r, c)
+                if (r, c) != (target_r, target_c) and self.board.state[r][c] == STATE_HIDDEN and (r, c) not in self.board.mines and not touches_any_revealed(r, c)
             ]
             if all_hidden_floating:
                 self.board.mines.add(all_hidden_floating[0])
@@ -363,13 +385,13 @@ class KarmaEngine:
                     return any(abs(r - rev_r) <= 1 and abs(c - rev_c) <= 1 for rev_r, rev_c in revealed_all)
 
                 if mine_delta > 0:
-                    floating = [m for m in list(self.board.mines) if not touches_any_revealed(m[0], m[1])]
+                    floating = [m for m in list(self.board.mines) if m != (target_r, target_c) and not touches_any_revealed(m[0], m[1])]
                     for i in range(min(mine_delta, len(floating))):
                         self.board.mines.remove(floating[i])
                 elif mine_delta < 0:
                     all_hidden_floating = [
                         (r, c) for r in range(self.board.height) for c in range(self.board.width)
-                        if self.board.state[r][c] == STATE_HIDDEN and (r, c) not in self.board.mines and not touches_any_revealed(r, c)
+                        if (r, c) != (target_r, target_c) and self.board.state[r][c] == STATE_HIDDEN and (r, c) not in self.board.mines and not touches_any_revealed(r, c)
                     ]
                     for i in range(min(abs(mine_delta), len(all_hidden_floating))):
                         self.board.mines.add(all_hidden_floating[i])

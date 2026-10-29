@@ -477,15 +477,28 @@ class MinesweeperGame {
 
     showPostMortem(res) {
         this.postMortemCard.style.display = "flex";
+        const titleEl = this.postMortemCard.querySelector(".post-mortem-title");
         const missed = res.missed_safe_cell;
         const clicked = res.clicked;
-        this.postMortemText.innerHTML = `
-            You clicked unproven tile <strong>(${clicked.r + 1}, ${clicked.c + 1})</strong>. 
-            However, tile <strong style="color: var(--accent-emerald);">(${missed.r + 1}, ${missed.c + 1})</strong> was 100% logically guaranteed safe!<br>
-            <span style="color: var(--accent-cyan); font-size: 0.88rem; display: inline-block; margin-top: 4px;">
-                💡 Logic: ${res.explanation}
-            </span>
-        `;
+
+        if (missed) {
+            if (titleEl) titleEl.textContent = "💥 Unforced Gamble Punished!";
+            this.postMortemText.innerHTML = `
+                You clicked unproven tile <strong>(${clicked.r + 1}, ${clicked.c + 1})</strong>. 
+                However, tile <strong style="color: var(--accent-emerald);">(${missed.r + 1}, ${missed.c + 1})</strong> was 100% logically guaranteed safe!<br>
+                <span style="color: var(--accent-cyan); font-size: 0.88rem; display: inline-block; margin-top: 4px;">
+                    💡 Logic: ${res.explanation}
+                </span>
+            `;
+        } else {
+            if (titleEl) titleEl.textContent = "💣 Known Mine Detonated!";
+            this.postMortemText.innerHTML = `
+                You clicked tile <strong>(${clicked.r + 1}, ${clicked.c + 1})</strong>, which was already logically proven to be a mine!<br>
+                <span style="color: var(--accent-rose); font-size: 0.88rem; display: inline-block; margin-top: 4px;">
+                    💡 Logic: ${res.explanation}
+                </span>
+            `;
+        }
     }
 
     hidePostMortem() {

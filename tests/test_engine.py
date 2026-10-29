@@ -275,6 +275,53 @@ class TestFairMinesweeper(unittest.TestCase):
         result = solver.solve()
         self.assertIsNotNone(result)
 
+    def test_dense_board_forced_guess_protection(self):
+        """
+        Regression test: On a dense board (e.g. 10x10 with 98 mines, only 2 safe tiles),
+        when the first click opens an 8, clicking any wilderness tile MUST be protected as
+        a forced guess, and the target tile must NEVER be chosen as its own mine replacement.
+        """
+        import random
+        for _ in range(25):
+            engine = KarmaEngine()
+            board = engine.start_new_game(10, 10, 98)
+            res1 = engine.handle_click(5, 5)
+            
+            # Find a wilderness tile
+            hidden = [(r, c) for r in range(10) for c in range(10) if board.state[r][c] == STATE_HIDDEN]
+            neighbors = set(board.get_neighbors(5, 5))
+            wilderness = [c for c in hidden if c not in neighbors]
+            if wilderness and board.count_adjacent_mines(5, 5) == len(neighbors):
+                target = random.choice(wilderness)
+                res2 = engine.handle_click(target[0], target[1])
+                # Forced guess on wilderness must NOT detonate!
+                self.assertNotEqual(board.game_state, GAME_LOST, f"Died on forced guess {target}!")
+                self.assertEqual(board.game_state, GAME_WON)
+
+    def test_proven_mine_click_punished(self):
+        """
+        When a tile is logically proven to be a mine (e.g. clue 1 touching 1 hidden cell),
+        clicking that mine directly must detonate and trigger post-mortem explanation.
+        """
+        board = Board(width=4, height=4, num_mines=1)
+        board.first_click_done = True
+        board.game_state = GAME_IN_PROGRESS
+        board.mines = {(0, 0)}
+        board.state[1][1] = STATE_REVEALED
+        board.revealed_clues[(1, 1)] = 1
+        # Make (0,0) the only hidden neighbor of (1,1)
+        for nr, nc in board.get_neighbors(1, 1):
+            if (nr, nc) != (0, 0):
+                board.state[nr][nc] = STATE_REVEALED
+                board.revealed_clues[(nr, nc)] = 0
+
+        engine = KarmaEngine(board)
+        res = engine.handle_click(0, 0)
+        self.assertEqual(res["status"], "PUNISHED")
+        self.assertEqual(board.game_state, GAME_LOST)
+        self.assertIsNotNone(board.post_mortem)
+        self.assertTrue("require a mine" in board.post_mortem["explanation"] or "must be a mine" in board.post_mortem["explanation"])
+
 
 if __name__ == "__main__":
     unittest.main()
